@@ -1,0 +1,139 @@
+"""
+Name : Aleha Shahzad
+Project: Library Manager - Python OOP Mini
+
+What I learned:
+- Understanding Object-Oriented Programming using classes and objects.
+- Managing data using dictionaries, sets, and tuples.
+- Designing clean class relationships.
+- Handling errors in a structured way.
+
+Challenges faced:
+- Connecting Book, Member, and Library classes correctly.
+- Preventing duplicate borrowing.
+- Managing borrowing limits and validations.
+"""
+
+from dataclasses import dataclass, field
+
+
+@dataclass(frozen=True)
+class Book:
+    """Represents a book in the library."""
+    book_id: str
+    title: str
+    author: str
+
+    def label(self) -> str:
+        """Return readable book information."""
+        return f"{self.title} by {self.author} ({self.book_id})"
+
+
+@dataclass
+class Member:
+    """Represents a library member."""
+    member_id: str
+    name: str
+    borrowed: set[str] = field(default_factory=set)
+
+    def can_borrow(self, max_loans: int) -> bool:
+        """Check if member can borrow more books."""
+        return len(self.borrowed) < max_loans
+
+    def add_loan(self, book_id: str) -> None:
+        """Add borrowed book."""
+        self.borrowed.add(book_id)
+
+    def remove_loan(self, book_id: str) -> None:
+        """Remove returned book."""
+        self.borrowed.remove(book_id)
+
+
+class Library:
+    """Manages books, members, and loans."""
+
+    def __init__(self, max_loans: int = 3):
+        self.max_loans = max_loans
+        self.books = {}
+        self.members = {}
+        self.loans = {}
+
+    def add_book(self, book: Book):
+        """Add a new book to the library."""
+        if book.book_id in self.books:
+            raise ValueError("Book ID already exists.")
+        self.books[book.book_id] = book
+
+    def register_member(self, member: Member):
+        """Register a new member."""
+        if member.member_id in self.members:
+            raise ValueError("Member ID already exists.")
+        self.members[member.member_id] = member
+
+    def borrow(self, book_id: str, member_id: str, due_days: int = 14):
+        """Borrow a book."""
+        if book_id not in self.books:
+            raise KeyError("Book not found.")
+        if member_id not in self.members:
+            raise KeyError("Member not found.")
+        if book_id in self.loans:
+            raise ValueError("Book already borrowed.")
+
+        member = self.members[member_id]
+
+        if not member.can_borrow(self.max_loans):
+            raise ValueError("Loan limit reached.")
+
+        self.loans[book_id] = (member_id, due_days)
+        member.add_loan(book_id)
+
+    def return_book(self, book_id: str):
+        """Return a borrowed book."""
+        if book_id not in self.loans:
+            raise ValueError("Book is not borrowed.")
+
+        member_id, _ = self.loans.pop(book_id)
+        self.members[member_id].remove_loan(book_id)
+
+    def list_available(self):
+        """Return available books."""
+        return [b for bid, b in self.books.items() if bid not in self.loans]
+
+    def member_loans(self, member_id: str):
+        """Show member borrowed books."""
+        if member_id not in self.members:
+            raise KeyError("Member not found.")
+
+        result = []
+        for book_id in self.members[member_id].borrowed:
+            _, due = self.loans[book_id]
+            result.append((self.books[book_id], due))
+        return result
+
+
+if __name__ == "__main__":
+    lib = Library(max_loans=2)
+
+    lib.add_book(Book("B001", "Clean Code", "Robert C. Martin"))
+    lib.add_book(Book("B002", "Python Crash Course", "Eric Matthes"))
+    lib.add_book(Book("B003", "The Pragmatic Programmer", "Andrew Hunt"))
+
+    lib.register_member(Member("M001", "Ayesha"))
+    lib.register_member(Member("M002", "Hassan"))
+
+    lib.borrow("B001", "M001", 7)
+    lib.borrow("B002", "M001")
+
+    print("Available Books:")
+    for book in lib.list_available():
+        print("-", book.label())
+
+    print("\nAyesha Loans:")
+    for book, due in lib.member_loans("M001"):
+        print("-", book.label(), "| due in", due, "days")
+
+    lib.return_book("B001")
+
+    print("\nAfter returning B001:")
+    for book in lib.list_available():
+        print("-", book.label())
